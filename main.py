@@ -4,7 +4,7 @@ import json
 import subprocess
 import requests
 from groq import Groq
-import google.generativeai as genai
+from google import genai
 
 URL = sys.argv[1] if len(sys.argv) > 1 else None
 if not URL:
@@ -18,16 +18,20 @@ TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 print(f"🎬 Iniciando processamento do link: {URL}")
 
-# 1. Baixar apenas o áudio compactado (para não estourar limite da API)
+# Argumentos para driblar a checagem de robô do YouTube
+YTDL_ARGS = ["--extractor-args", "youtube:player_client=android,web"]
+
+# 1. Baixar apenas o áudio compacto
 print("📥 1/5 Baixando áudio do YouTube...")
 subprocess.run([
-    "yt-dlp", "-x", "--audio-format", "mp3", 
+    "yt-dlp", *YTDL_ARGS,
+    "-x", "--audio-format", "mp3", 
     "--audio-quality", "32K", 
     "-o", "audio.mp3", URL
 ], check=True)
 
 # 2. Transcrição com Whisper na Groq
-print("🎙️ 2/5 Transcrevendo áudio com IA (Groq Whisper)...")
+print("🎙️ 2/5 Transcrevendo áudio com Groq Whisper...")
 groq_client = Groq(api_key=GROQ_KEY)
 with open("audio.mp3", "rb") as file:
     transcription = groq_client.audio.transcriptions.create(
@@ -36,51 +40,51 @@ with open("audio.mp3", "rb") as file:
         response_format="verbose_json",
     )
 
-# Monta o texto com tempos para a IA analisar
 transcript_text = ""
 for seg in transcription.segments:
     start = round(seg["start"], 1)
     end = round(seg["end"], 1)
     transcript_text += f"[{start}s - {end}s]: {seg['text']}\n"
 
-# 3. Gemini escolhe o melhor trecho (30 a 60 segundos)
-print("🧠 3/5 IA (Gemini) escolhendo o momento mais interessante...")
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+# 3. Gemini escolhe o melhor trecho
+print("🧠 3/5 Gemini escolhendo o momento viral...")
+client_gemini = genai.Client(api_key=GEMINI_KEY)
 
 prompt = f"""
 Você é um editor de vídeos virais especialista em TikTok, Shorts e Reels.
 Abaixo está a transcrição de um vídeo com marcações de tempo em segundos.
 
-Encontre o melhor trecho com duração entre 30 e 70 segundos que seja curioso, viral ou passe uma mensagem de alto impacto com início, meio e fim.
+Encontre o melhor trecho com duração entre 30 e 70 segundos que seja curioso, viral ou de alto impacto.
 
-Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown (sem ```json), no seguinte padrão:
+Responda EXCLUSIVAMENTE em formato JSON puro, sem marcação markdown (sem ```json), no seguinte padrão:
 {{"start": 12.0, "end": 65.0, "reason": "Motivo da escolha"}}
 
 Transcrição:
 {transcript_text[:30000]}
 """
 
-response = model.generate_content(prompt)
+response = client_gemini.models.generate_content(
+    model="gemini-1.5-flash",
+    contents=prompt
+)
+
 clean_json = response.text.replace("```json", "").replace("```", "").strip()
 cortes = json.loads(clean_json)
 
 start_time = cortes["start"]
 end_time = cortes["end"]
-motivo = cortes.get("reason", "Trecho viral selecionado")
-print(f"🎯 Trecho selecionado: {start_time}s até {end_time}s")
-print(f"💡 Motivo: {motivo}")
+motivo = cortes.get("reason", "Corte selecionado")
+print(f"🎯 Trecho: {start_time}s até {end_time}s | 💡 Motivo: {motivo}")
 
-# 4. Baixar o vídeo e renderizar em 9:16 (formato vertical)
+# 4. Baixar vídeo e converter para 9:16
 print("✂️ 4/5 Baixando vídeo e convertendo para formato vertical (9:16)...")
-# Baixa o vídeo em 720p
 subprocess.run([
-    "yt-dlp", "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]",
+    "yt-dlp", *YTDL_ARGS,
+    "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]",
     "--merge-output-format", "mp4",
     "-o", "full_video.mp4", URL
 ], check=True)
 
-# Filtro FFmpeg: Fundo desfocado 9:16 com o vídeo original centralizado
 duracao = end_time - start_time
 ffmpeg_cmd = [
     "ffmpeg", "-y",
@@ -100,7 +104,7 @@ ffmpeg_cmd = [
 subprocess.run(ffmpeg_cmd, check=True)
 
 # 5. Enviar para o Telegram
-print("🚀 5/5 Enviando vídeo para o seu Telegram...")
+print("🚀 5/5 Enviando para o seu Telegram...")
 url_tg = f"https://api.telegram.org/bot{TG_TOKEN}/sendVideo"
 caption = f"🎬 **Corte Gerado com Sucesso!**\n⏱️ Trecho: {start_time}s a {end_time}s\n💡 {motivo}"
 
