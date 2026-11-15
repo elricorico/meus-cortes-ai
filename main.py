@@ -20,12 +20,12 @@ COOKIES_DATA = os.environ.get("YOUTUBE_COOKIES")
 print(f"🎬 Iniciando processamento do link: {URL}")
 
 # Se houver cookies configurados, salva no disco e avisa o yt-dlp
-YTDL_ARGS = []
+YTDL_ARGS = ["--js-runtimes", "node"]
 if COOKIES_DATA:
     print("🍪 Cookies do YouTube detectados e carregados!")
     with open("cookies.txt", "w", encoding="utf-8") as f:
         f.write(COOKIES_DATA)
-    YTDL_ARGS = ["--cookies", "cookies.txt"]
+    YTDL_ARGS = ["--cookies", "cookies.txt", "--js-runtimes", "node"]
 
 # 1. Baixar apenas o áudio compacto
 print("📥 1/5 Baixando áudio do YouTube...")
