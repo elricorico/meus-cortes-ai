@@ -15,11 +15,17 @@ GROQ_KEY = os.environ.get("GROQ_API_KEY")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+COOKIES_DATA = os.environ.get("YOUTUBE_COOKIES")
 
 print(f"🎬 Iniciando processamento do link: {URL}")
 
-# Argumentos para driblar a checagem de robô do YouTube
-YTDL_ARGS = ["--extractor-args", "youtube:player_client=ios"]
+# Se houver cookies configurados, salva no disco e avisa o yt-dlp
+YTDL_ARGS = []
+if COOKIES_DATA:
+    print("🍪 Cookies do YouTube detectados e carregados!")
+    with open("cookies.txt", "w", encoding="utf-8") as f:
+        f.write(COOKIES_DATA)
+    YTDL_ARGS = ["--cookies", "cookies.txt"]
 
 # 1. Baixar apenas o áudio compacto
 print("📥 1/5 Baixando áudio do YouTube...")
