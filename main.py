@@ -19,7 +19,7 @@ TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 print(f"🎬 Iniciando processamento do link: {URL}")
 
 # Argumentos para driblar a checagem de robô do YouTube
-YTDL_ARGS = ["--extractor-args", "youtube:player_client=android,web"]
+YTDL_ARGS = ["--extractor-args", "youtube:player_client=ios"]
 
 # 1. Baixar apenas o áudio compacto
 print("📥 1/5 Baixando áudio do YouTube...")
